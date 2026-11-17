@@ -1,0 +1,21 @@
+-- Datenbank erstellen
+CREATE DATABASE IF NOT EXISTS bsef3_projekt;
+USE bsef3_projekt;
+
+-- Tabelle fuer DHT11-Messwerte
+CREATE TABLE IF NOT EXISTS messdaten_dht11 (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    zeitstempel TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    temperatur DECIMAL(5,2) NOT NULL,
+    luftfeuchtigkeit DECIMAL(5,2) NOT NULL
+);
+
+-- Benutzer (Platzhalter werden von install.sh ersetzt)
+CREATE USER IF NOT EXISTS 'sensor_writer'@'%' IDENTIFIED BY '__SENSOR_PW__';
+CREATE USER IF NOT EXISTS 'web_viewer'@'%' IDENTIFIED BY '__WEB_PW__';
+
+-- Rechte nach dem Least-Privilege-Prinzip
+GRANT INSERT ON bsef3_projekt.messdaten_dht11 TO 'sensor_writer'@'%';
+GRANT SELECT ON bsef3_projekt.messdaten_dht11 TO 'web_viewer'@'%';
+
+FLUSH PRIVILEGES;
