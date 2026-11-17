@@ -1,0 +1,9 @@
+# Zugangsdaten - werden von install.sh lokal erzeugt
+.env
+db.conf
+init_database.sql
+
+# Python-Umgebung und Backups
+venv/
+backup/
+__pycache__/
