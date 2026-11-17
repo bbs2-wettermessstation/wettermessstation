@@ -1,0 +1,73 @@
+1. Installation lief durch
+
+Am Ende von install.sh muss „Installation abgeschlossen.“ stehen. Wegen set -euo pipefail bricht das Skript bei jedem Fehler sofort ab. Fehlt die Zeile, steht der Fehler direkt darüber.
+
+2. Zeit und Dienste
+Shell
+timedatectl | grep synchronized # yes (oder Zeit stimmt per HTTP)
+systemctl is-active docker tailscaled # active, active
+systemctl is-active apache2 mariadb # inactive bzw. "not found"
+3. Container
+Shell
+cd /opt/wettermessstation
+sudo docker compose ps
+sudo docker compose logs db | grep -i -E "initdb|error|ready for connections"
+Beide Container (wetter-db, wetter-web) haben den Status Up.
+Im Log stehen running /docker-entrypoint-initdb.d/init.sql und ready for connections, aber kein ERROR. Die io_uring-Warnung ist harmlos.
+4. Passwörter passen zusammen
+Shell
+sudo ls -l .env db.conf init_database.sql # .env/db.conf: -rw------- root root
+sudo grep -c "__" init_database.sql # 0 = alle Platzhalter ersetzt
+sudo docker exec wetter-web printenv WEB_DB_PASSWORD # gibt das Passwort aus
+
+Wenn der letzte Befehl nichts ausgibt, fehlt WEB_DB_PASSWORD in der .env oder in der docker-compose.yml.
+
+5. Sensor → Datenbank
+Shell
+sudo /opt/wettermessstation/venv/bin/python /opt/wettermessstation/dht11_messung.py
+
+Erwartet wird Gespeichert: ... C, ... %. Danach prüft ihr die Datenbank:
+
+Shell
+sudo docker exec -it wetter-db sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" -e "SELECT * FROM bsef3_projekt.messdaten_dht11 ORDER BY id DESC LIMIT 5;"'
+6. Cron misst automatisch
+Shell
+sudo crontab -l | grep dht11 # genau EINE Zeile
+
+Wartet zwei Minuten und wiederholt die Abfrage aus Schritt 5. Es müssen neue Zeilen mit aktuellem Zeitstempel dazugekommen sein.
+
+7. Webseite
+Lokal: http://<IP aus hostname -I>/
+Über VPN: http://<Tailscale-IP>/
+
+Die aktuellen Werte müssen erscheinen, und nach 60 Sekunden lädt die Seite neu. Kommt „Fehler bei der Datenbankverbindung.“, findet ihr die Ursache mit sudo docker compose logs web.
+
+8. Sicherheit
+Shell
+sudo ufw status verbose # active, nur 22 und 80 erlaubt
+sudo ss -tlnp | grep -E ':80 |:3306 ' # 3306 nur auf 127.0.0.1, beide docker-proxy
+tailscale status # Pi online
+
+Testet außerdem Folgendes:
+
+Test	Erwartung
+Als stationsuser ohne sudo: cat /opt/wettermessstation/db.conf	Permission denied
+Ein weiterer, eingeschränkter Benutzer: ls /opt/wettermessstation	Permission denied
+Laptop A pingt Laptop B über Tailscale	keine Antwort
+SSH und Webseite vom Laptop zum Pi über Tailscale	funktioniert
+9. Neustart-Test (der wichtigste)
+Shell
+sudo reboot
+
+Nach etwa zwei Minuten muss gelten:
+
+Es erscheint ein Anmeldebildschirm, also kein Auto-Login.
+Container, Tailscale und Firewall laufen wieder (Schritte 3 und 8).
+Auf der Webseite tauchen neue Messwerte auf.
+10. Updates funktionieren
+Shell
+cd /opt/wettermessstation
+sudo git pull
+sudo bash install.sh
+
+Das Skript muss ein zweites Mal ohne Fehler durchlaufen. In der Ausgabe muss „.env existiert bereits – Passwoerter bleiben unveraendert.“ stehen, und die Webseite muss danach weiter funktionieren.
