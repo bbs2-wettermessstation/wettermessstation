@@ -45,8 +45,8 @@ if ! command -v tailscale >/dev/null 2>&1; then
 fi
 systemctl enable --now tailscaled
 if ! tailscale status >/dev/null 2>&1; then
-    read -r -s -p "Tailscale Auth-Key eingeben: " TS_KEY; echo
-    tailscale up --auth-key="$TS_KEY" --advertise-tags=tag:wetterstation --hostname=wetterstation
+    echo "Bitte die folgende URL im Browser oeffnen und das Geraet bestaetigen:"
+    tailscale up --hostname=wettermessstation
 fi
 
 echo "== 5. Passwoerter erzeugen (nur beim ersten Lauf) =="
