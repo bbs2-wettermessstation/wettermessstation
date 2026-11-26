@@ -13,7 +13,7 @@ Installation
 # Falls die Uhrzeit falsch ist (sonst schlagen apt und git fehl):
 sudo date -s "$(curl -sI http://deb.debian.org | grep -i '^date:' | cut -d' ' -f2- | tr -d '\r')"
 
-sudo apt update && sudo apt install -y git
+sudo apt update && upgrade -y
 sudo git clone https://github.com/bbs2-wettermessstation/wettermessstation.git /opt/wettermessstation
 sudo bash /opt/wettermessstation/install.sh
 
