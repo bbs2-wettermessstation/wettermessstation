@@ -115,5 +115,6 @@ echo "Installation abgeschlossen."
 echo "Weboberflaeche lokal:     http://$(hostname -I | awk '{print $1}')"
 echo "Weboberflaeche Tailscale: http://$(tailscale ip -4 2>/dev/null || echo '-')"
 echo
-echo "WICHTIG: Bitte jetzt einmal neu starten (sudo reboot),"
-echo "damit der DHT11-Treiber aktiv wird."
+echo "WICHTIG: Der Raspberry Pi startet jetzt neu, damit der DHT11-Treiber aktiv wird."
+
+sudo reboot
