@@ -29,6 +29,11 @@ sudo cat /opt/wettermessstation/.env
 sudo cat /opt/wettermessstation/db.conf
 
 
+
+
+
+
+
 Die zuverlässige Lösung: Kernel-Treiber statt Blinka
 
 Raspberry Pi OS bringt einen eigenen DHT11-Treiber im Linux-Kernel mit. Der Kernel misst die Pulse viel genauer als Python. Das ist die stabilste Variante, und du brauchst dafür weder Blinka noch gpiod.
@@ -77,3 +82,45 @@ Shell
 grep -q "dtoverlay=dht11" /boot/firmware/config.txt || echo "dtoverlay=dht11,gpiopin=4" >> /boot/firmware/config.txt
 
 Die pip-Pakete adafruit-circuitpython-dht und gpiod brauchst du dann nicht mehr, pymysql reicht.
+
+
+
+
+stationsuser@wettermessstation:~ $ sudo /opt/wettermessstation/venv/bin/python /opt/wettermessstation/dht11_messung.py
+Traceback (most recent call last):
+  File "/opt/wettermessstation/dht11_messung.py", line 77, in <module>
+    main()
+    ~~~~^^
+  File "/opt/wettermessstation/dht11_messung.py", line 63, in main
+    temp, feuchte = sensor_auslesen()
+                    ~~~~~~~~~~~~~~~^^
+  File "/opt/wettermessstation/dht11_messung.py", line 25, in sensor_auslesen
+    temp = sensor.temperature
+           ^^^^^^^^^^^^^^^^^^
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/adafruit_dht.py", line 269, in temperature
+    self.measure()
+    ~~~~~~~~~~~~^^
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/adafruit_dht.py", line 216, in measure
+    pulses = self._get_pulses_bitbang()
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/adafruit_dht.py", line 158, in _get_pulses_bitbang
+    with DigitalInOut(self._pin) as dhtpin:
+         ~~~~~~~~~~~~^^^^^^^^^^^
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/digitalio.py", line 74, in __init__
+    self.direction = Direction.INPUT
+    ^^^^^^^^^^^^^^
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/digitalio.py", line 107, in direction
+    self._pin.init(mode=Pin.IN)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/adafruit_blinka/microcontroller/generic_linux/libgpiod/libgpiod_pin_2_x.py", line 86, in init
+    self._line_request = self._chip.request_lines(
+                         ~~~~~~~~~~~~~~~~~~~~~~~~^
+        config={int(self._num): None}, consumer=self._CONSUMER
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/wettermessstation/venv/lib/python3.13/site-packages/gpiod/chip.py", line 322, in request_lines
+    req_internal = cast("_ext.Chip", self._chip).request_lines(
+        line_cfg, consumer, event_buffer_size
+    )
+OSError: [Errno 16] Device or resource busy
+stationsuser@wettermessstation:~ $
