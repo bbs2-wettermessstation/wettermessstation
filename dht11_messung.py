@@ -1,37 +1,52 @@
 #!/usr/bin/env python3
 """
 Liest Temperatur und Luftfeuchtigkeit vom DHT11 (GPIO4)
-und speichert sie in der Tabelle messdaten_dht11.
+über den Kernel-Treiber (dtoverlay=dht11) und speichert sie
+in der Tabelle messdaten_dht11.
 Wird per Cron jede Minute gestartet.
 """
 import sys
 import time
+import glob
 import configparser
 
-import board
-import adafruit_dht
 import pymysql
 
 CONFIG_DATEI = "/opt/wettermessstation/db.conf"
 MAX_VERSUCHE = 5
 
 
+def sensor_pfad_finden():
+    """Sucht das IIO-Gerät des DHT11-Kernel-Treibers."""
+    for pfad in glob.glob("/sys/bus/iio/devices/iio:device*"):
+        with open(pfad + "/name") as f:
+            if f.read().strip().startswith("dht11"):
+                return pfad
+    return None
+
+
+def wert_lesen(pfad, datei):
+    """Liest einen Wert (in Tausendsteln) und rechnet ihn um."""
+    with open(f"{pfad}/{datei}") as f:
+        return int(f.read().strip()) / 1000
+
+
 def sensor_auslesen():
     """Liest den Sensor mit mehreren Versuchen aus."""
-    sensor = adafruit_dht.DHT11(board.D4, use_pulseio=False)
-    try:
-        for versuch in range(1, MAX_VERSUCHE + 1):
-            try:
-                temp = sensor.temperature
-                feuchte = sensor.humidity
-                if temp is not None and feuchte is not None:
-                    return temp, feuchte
-            except RuntimeError as e:
-                print(f"Versuch {versuch}: Lesefehler - {e}")
-            time.sleep(2)  # DHT11 braucht Pausen zwischen Messungen
+    pfad = sensor_pfad_finden()
+    if pfad is None:
+        print("FEHLER: DHT11-Kernel-Treiber nicht gefunden (dtoverlay aktiv?).")
         return None, None
-    finally:
-        sensor.exit()
+
+    for versuch in range(1, MAX_VERSUCHE + 1):
+        try:
+            temp = wert_lesen(pfad, "in_temp_input")
+            feuchte = wert_lesen(pfad, "in_humidityrelative_input")
+            return temp, feuchte
+        except OSError as e:
+            print(f"Versuch {versuch}: Lesefehler - {e}")
+            time.sleep(2)  # DHT11 braucht Pausen zwischen Messungen
+    return None, None
 
 
 def werte_plausibel(temp, feuchte):
