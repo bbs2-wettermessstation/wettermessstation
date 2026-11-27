@@ -27,3 +27,53 @@ sudo bash install.sh
 Passwörter anzeigen
 sudo cat /opt/wettermessstation/.env
 sudo cat /opt/wettermessstation/db.conf
+
+
+Die zuverlässige Lösung: Kernel-Treiber statt Blinka
+
+Raspberry Pi OS bringt einen eigenen DHT11-Treiber im Linux-Kernel mit. Der Kernel misst die Pulse viel genauer als Python. Das ist die stabilste Variante, und du brauchst dafür weder Blinka noch gpiod.
+
+1. Treiber aktivieren:
+
+Shell
+echo "dtoverlay=dht11,gpiopin=4" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+
+2. Nach dem Neustart testen:
+
+Shell
+cat /sys/bus/iio/devices/iio:device0/in_temp_input
+cat /sys/bus/iio/devices/iio:device0/in_humidityrelative_input
+
+Die Werte kommen in Tausendsteln, zum Beispiel bedeutet 21000 21,0 °C. Ein einzelner Fehler wie Connection timed out oder Input/output error ist normal, dann einfach 2 Sekunden warten und nochmal versuchen.
+
+3. Im Skript die Lesefunktion ersetzen:
+
+Die Imports board und adafruit_dht fallen weg. Stattdessen:
+
+Python
+SENSOR_PFAD = "/sys/bus/iio/devices/iio:device0/"
+ 
+def wert_lesen(datei):
+with open(SENSOR_PFAD + datei) as f:
+return int(f.read().strip()) / 1000
+ 
+def sensor_auslesen():
+"""Liest den DHT11 über den Kernel-Treiber mit mehreren Versuchen."""
+for versuch in range(1, MAX_VERSUCHE + 1):
+try:
+return wert_lesen("in_temp_input"), wert_lesen("in_humidityrelative_input")
+except OSError as e:
+print(f"Versuch {versuch}: Lesefehler - {e}")
+time.sleep(2) # DHT11 braucht Pausen zwischen Messungen
+return None, None
+ 
+
+Der Rest des Skripts bleibt gleich. Danach den Cron-Eintrag wieder aktivieren.
+
+4. In install.sh übernehmen: Ergänze diese Zeile, damit das Overlay bei einer Neuinstallation nicht doppelt eingetragen wird. Nach der Installation ist dann einmal ein Neustart nötig:
+
+Shell
+grep -q "dtoverlay=dht11" /boot/firmware/config.txt || echo "dtoverlay=dht11,gpiopin=4" >> /boot/firmware/config.txt
+
+Die pip-Pakete adafruit-circuitpython-dht und gpiod brauchst du dann nicht mehr, pymysql reicht.
