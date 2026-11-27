@@ -24,22 +24,23 @@ fi
 echo "== 2. Pakete installieren =="
 apt update
 apt upgrade -y
-apt install -y git curl openssl ufw python3 python3-venv swig python3-dev liblgpio-dev
-if apt-cache show libgpiod3 >/dev/null 2>&1; then
-    apt install -y libgpiod3
-else
-    apt install -y libgpiod2
-fi
+apt install -y git curl openssl ufw python3 python3-venv
 apt autoremove -y
 
-echo "== 3. Docker installieren (falls noetig) =="
+echo "== 3. DHT11-Kernel-Treiber aktivieren (wirksam nach Neustart) =="
+BOOT_CONFIG=/boot/firmware/config.txt
+[ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
+grep -q "dtoverlay=dht11" "$BOOT_CONFIG" || \
+    echo "dtoverlay=dht11,gpiopin=4" >> "$BOOT_CONFIG"
+
+echo "== 4. Docker installieren (falls noetig) =="
 if ! command -v docker >/dev/null 2>&1; then
     curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
     sh /tmp/get-docker.sh
 fi
 systemctl enable --now docker
 
-echo "== 4. Tailscale installieren und anmelden (falls noetig) =="
+echo "== 5. Tailscale installieren und anmelden (falls noetig) =="
 if ! command -v tailscale >/dev/null 2>&1; then
     curl -fsSL https://tailscale.com/install.sh | sh
 fi
@@ -49,7 +50,7 @@ if ! tailscale status >/dev/null 2>&1; then
     tailscale up --hostname=wettermessstation
 fi
 
-echo "== 5. Passwoerter erzeugen (nur beim ersten Lauf) =="
+echo "== 6. Passwoerter erzeugen (nur beim ersten Lauf) =="
 if [ ! -f .env ]; then
     ROOT_PW=$(openssl rand -hex 16)
     SENSOR_PW=$(openssl rand -hex 16)
@@ -77,26 +78,26 @@ else
     echo ".env existiert bereits - Passwoerter bleiben unveraendert."
 fi
 
-echo "== 6. Python-Umgebung fuer den Sensor =="
+echo "== 7. Python-Umgebung fuer den Sensor =="
 [ -d venv ] || python3 -m venv venv
-venv/bin/pip install --upgrade adafruit-circuitpython-dht pymysql
+venv/bin/pip install --upgrade pymysql
 
-echo "== 7. Container bauen und starten =="
+echo "== 8. Container bauen und starten =="
 docker compose up -d --build
 
-echo "== 8. Cron-Job eintragen (ohne Doppelungen) =="
+echo "== 9. Cron-Job eintragen (ohne Doppelungen) =="
 ( crontab -l 2>/dev/null | grep -v dht11_messung.py || true
   echo "* * * * * $PROJEKT/venv/bin/python $PROJEKT/dht11_messung.py >/dev/null 2>&1"
 ) | crontab -
 
-echo "== 9. Firewall =="
+echo "== 10. Firewall =="
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp comment 'SSH Administration'
 ufw allow 80/tcp comment 'Weboberflaeche'
 ufw --force enable
 
-echo "== 10. Rechte setzen (erst jetzt, wenn alle Dateien existieren) =="
+echo "== 11. Rechte setzen (erst jetzt, wenn alle Dateien existieren) =="
 chown -R "$ADMIN":www-data "$PROJEKT"
 find "$PROJEKT" -path "$PROJEKT/venv" -prune -o -type d -exec chmod 750 {} +
 chmod 640 www/index.php dht11_messung.py docker-compose.yml docker/Dockerfile install.sh init_database.sql.template
@@ -106,10 +107,13 @@ chmod 600 .env db.conf
 # root darf git pull im Ordner von stationsuser ausfuehren
 git config --global --add safe.directory "$PROJEKT"
 
-echo "== 11. Auto-Login deaktivieren =="
+echo "== 12. Auto-Login deaktivieren =="
 raspi-config nonint do_boot_behaviour B3
 
 echo
 echo "Installation abgeschlossen."
-echo "Weboberflaeche lokal:    http://$(hostname -I | awk '{print $1}')"
+echo "Weboberflaeche lokal:     http://$(hostname -I | awk '{print $1}')"
 echo "Weboberflaeche Tailscale: http://$(tailscale ip -4 2>/dev/null || echo '-')"
+echo
+echo "WICHTIG: Bitte jetzt einmal neu starten (sudo reboot),"
+echo "damit der DHT11-Treiber aktiv wird."
