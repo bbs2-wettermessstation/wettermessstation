@@ -44,8 +44,8 @@ Admin Console → Access controls → JSON-Editor. Den Inhalt durch folgenden er
   ]
 }
 
-2. Tag dem Raspbe*ry Pi zuweisen
-Admin Console → achines → beim Gerät wettermess*tation auf … → Edit ACL tag → tag:wettermessst*tion auswählen und speichern.
+2. Tag dem Raspberry Pi zuweisen
+Admin Console → Machines → beim Gerät wettermessstation auf … → Edit ACL tag → tag:wettermessstation auswählen und speichern.
 
 
 Update
